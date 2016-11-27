@@ -71,7 +71,11 @@ static char* buildhtml( request_rec *r, const char* mdfile ){
   	pp = popen(cmd, "r");
 
 	// returning later an internal buffer is bad ...
+	
+	// this also not thread safe !!!
+
 	// also output is limited in total to 60000 chars
+
 	static char buf[60000];
 	buf[0]=0;
 
