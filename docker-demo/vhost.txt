@@ -1,9 +1,15 @@
 
-
 <VirtualHost *:81>
 
 	SetHandler asdbtest
 	DocumentRoot /var/www/html
+
+</VirtualHost>
+
+<VirtualHost *:82>
+
+	SetHandler asdbjs
+	DocumentRoot /var/www/js
 
 </VirtualHost>
 
