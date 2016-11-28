@@ -26,7 +26,7 @@ sudo make all
 
 # get and build spidermonkey
 
-cd ~/repo/apache2-module-demo/
+cd ~/repo/
 
 git clone https://github.com/mozilla/gecko-dev.git --branch GECKO4502_2016040719_RELBRANCH --single-branch
 
