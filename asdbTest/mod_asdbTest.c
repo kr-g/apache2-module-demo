@@ -87,6 +87,7 @@ static char* buildhtml( request_rec *r, const char* mdfile ){
 		for(;;){
 			l = fgets( l, sizeof line, pp );
 			if( !l ) break;
+			// no check of buffer overflow ...
 			strncat ( buf, l, sizeof line-1 );
 		}
 			
