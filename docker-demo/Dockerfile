@@ -34,7 +34,7 @@ RUN sudo chmod +x *.sh
 
 RUN mkdir -p ~/repo/
 RUN git clone https://github.com/kr-g/apache2-module-demo.git ~/repo/apache2-module-demo
-RUN git clone https://github.com/mozilla/gecko-dev.git --branch GECKO4502_2016040719_RELBRANCH --single-branch ~/repo/gecko-dev
+RUN git clone https://github.com/mozilla/gecko-dev.git --single-branch --depth 1 --branch GECKO4502_2016040719_RELBRANCH ~/repo/gecko-dev
 
 RUN mkdir -p ~/repo/spidermonkey
 RUN ln -s ~/repo/spidermonkey /spidermonkey
@@ -42,7 +42,8 @@ VOLUME /spidermonkey
 
 RUN /setup.sh
 
-RUN mv ~/repo/gecko-dev/js/src/build_OPT.OBJ/dist/bin/* ~/repo/spidermonkey
+RUN cp ~/repo/gecko-dev/js/src/build_OPT.OBJ/js/src/shell/js ~/repo/spidermonkey
+RUN ln -s ~/repo/spidermonkey/js ~/repo/spidermonkey/spidermonkeyjs 
 RUN rm ~/repo/gecko-dev -rf
 
 

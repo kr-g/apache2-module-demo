@@ -28,9 +28,6 @@ cd build_OPT.OBJ
 
 make
 
-cd dist/bin
-# use link in case node.js is in the path
-ln -s js spidermonkeyjs 
 
 
 
