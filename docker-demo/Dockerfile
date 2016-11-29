@@ -42,7 +42,7 @@ VOLUME /spidermonkey
 
 RUN /setup.sh
 
-RUN mv ~/repo/gecko-dev/js/src/build_OPT.OBJ/dist/bin ~/repo/spidermonkey
+RUN mv ~/repo/gecko-dev/js/src/build_OPT.OBJ/dist/bin/* ~/repo/spidermonkey
 RUN rm ~/repo/gecko-dev -rf
 
 
