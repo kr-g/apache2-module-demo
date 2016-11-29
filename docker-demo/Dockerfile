@@ -25,7 +25,9 @@ ADD ports.txt /
 RUN sudo cat ports.txt >> /etc/apache2/ports.conf
 
 ADD *.md /html/
+ADD *.html /html/
 ADD *.js /js/
+ADD *.html /js/
 
 ADD *.sh /
 RUN sudo chmod +x *.sh
