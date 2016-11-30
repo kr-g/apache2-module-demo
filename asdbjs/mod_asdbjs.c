@@ -46,6 +46,64 @@
 #include <stdlib.h>
 
 
+#define BLOCKSIZE 8192
+
+void get_post_data( request_rec *r ){
+
+ 	int ret = ap_setup_client_block(r, REQUEST_CHUNKED_ERROR);
+
+	if(OK == ret && ap_should_client_block(r))
+	{
+		char* buffer = (char*)apr_pcalloc(r->pool, BLOCKSIZE);
+
+		int len;
+
+		while((len=ap_get_client_block(r, buffer, BLOCKSIZE)) > 0)
+		{
+			// write data...
+			buffer[len] = 0;
+			ap_rprintf( r, "post data\n%s\n", buffer );
+
+		}
+
+	}
+
+}
+
+
+static int printitem(void *rec, const char *key, const char *value)
+{
+	request_rec *r = rec;
+	ap_rprintf(r, "%s: %s\n", ap_escape_html(r->pool, key), ap_escape_html(r->pool, value));
+	/* Zero would stop iterating; any other return value continues */
+	return 1;
+}
+
+static void printheader(request_rec *r){
+	ap_rprintf( r, "protocol %s\n", r->protocol );
+	ap_rprintf( r, "uri %s\n", r->unparsed_uri );
+	ap_rprintf( r, "path_info %s\n", r->path_info );
+	ap_rprintf( r, "method %s\n", r->method );
+	ap_rprintf( r, "useragent_ip %s\n", r->useragent_ip );
+	ap_rprintf( r, "filename %s\n", r->filename );
+   	ap_rprintf( r, "args %s\n", r->args );
+   	ap_rprintf( r, "clength %s\n", r->clength );
+   	ap_rprintf( r, "content_encoding %s\n", r->content_encoding );
+   	ap_rprintf( r, "content_type %s\n", r->content_type );
+   	ap_rprintf( r, "hostname %s\n", r->hostname );
+   	ap_rprintf( r, "log_id %s\n", r->log_id );
+   	ap_rprintf( r, "range %s\n", r->range );
+   	ap_rprintf( r, "status_line %s\n", r->status_line );
+   	ap_rprintf( r, "the_request %s\n", r->the_request );
+   	ap_rprintf( r, "unparsed_uri %s\n", r->unparsed_uri );
+   	ap_rprintf( r, "user %s\n", r->user );
+   	ap_rprintf( r, "vlist_validator %s\n", r->vlist_validator );
+
+	apr_array_header_t* header = apr_table_elts( r->headers_in ) ;
+	ap_rprintf( r, "*headers_in\n");
+	apr_table_do(printitem, r, r->headers_in, NULL);
+}
+
 
 static char* runjs( request_rec *r, const char* jsfile ){
 	FILE *pp;
@@ -104,6 +162,8 @@ static char* runjs( request_rec *r, const char* jsfile ){
 
 
 
+
+
 /* The sample content handler */
 static int asdbjs_handler(request_rec *r)
 {
@@ -125,7 +185,13 @@ static int asdbjs_handler(request_rec *r)
 	}
 	strcat( fnam, ".js" );
 
+	printheader( r );
 	ap_rprintf( r, "running %s\n", fnam );    
+	ap_rprintf( r, "path %s\n", getenv("PATH") );    
+
+	if( M_POST == r->method_number ){
+		get_post_data( r );
+	}
 
 	char *html = runjs( r, fnam );
 	ap_rprintf( r, "<br/>%s", html );    
@@ -149,4 +215,6 @@ module AP_MODULE_DECLARE_DATA asdbjs_module = {
     NULL,                  /* table of config file commands       */
     asdbjs_register_hooks  /* register hooks                      */
 };
+
+
 
