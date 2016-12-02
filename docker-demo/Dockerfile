@@ -3,7 +3,7 @@ FROM ubuntu:16.04
 RUN apt-get update 
 RUN apt-get install -y vim curl unzip sudo markdown
 RUN apt-get install -y git apache2 apache2-dev
-RUN apt-get install -y autoconf2.13 phyton
+RUN apt-get install -y autoconf2.13 python
 
 
 EXPOSE 81
