@@ -1,10 +1,16 @@
 #!/bin/bash
 
-. /etc/apache2/envvars
 
-export PATH=$PATH:~/repo/spidermonkey
+apachectl start
+
 
 #  start in debug mod 
-apache2 -X
+#apache2 -X
+
+
+# log vm status to console
+
+vmstat 5
+
 
 
