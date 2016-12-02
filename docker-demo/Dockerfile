@@ -38,8 +38,8 @@ RUN /setup.sh /
 #RUN SHELL=$XTERM_SHELL /setup-spider.sh /
 #RUN rm /repo/gecko-dev -rf
 
-#ADD js /repo/bin/spidermonkeyjs
-#RUN ln -s /repo/bin/spidermonkeyjs /usr/local/sbin/spidermonkeyjs -f
+ADD js /repo/bin/spidermonkeyjs
+RUN ln -s /repo/bin/spidermonkeyjs /usr/local/sbin/spidermonkeyjs -f
 
 
 

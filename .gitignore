@@ -1,5 +1,5 @@
 */.libs/**
 */.o/**
 */gecko-dev/**
-/docker-demo/js
+#/docker-demo/js
 
