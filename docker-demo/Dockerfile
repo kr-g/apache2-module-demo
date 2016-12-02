@@ -3,7 +3,7 @@ FROM ubuntu:16.04
 RUN apt-get update 
 RUN apt-get install -y vim curl unzip sudo markdown
 RUN apt-get install -y git apache2 apache2-dev
-RUN apt-get install -y autoconf2.13
+RUN apt-get install -y autoconf2.13 phyton
 
 
 EXPOSE 81
@@ -35,7 +35,7 @@ RUN /setup.sh /
 
 RUN git clone https://github.com/mozilla/gecko-dev.git --single-branch --depth 1 --branch GECKO4502_2016040719_RELBRANCH /repo/gecko-dev
 #ADD gecko-dev /repo/gecko-dev/
-RUN /setup-spider.sh /
+RUN SHELL=$XTERM_SHELL /setup-spider.sh /
 #RUN rm /repo/gecko-dev -rf
 
 #ADD js /repo/bin/spidermonkeyjs
