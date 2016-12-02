@@ -33,9 +33,9 @@ RUN mkdir -p /repo/bin
 RUN git clone https://github.com/kr-g/apache2-module-demo.git /repo/apache2-module-demo
 RUN /setup.sh /
 
-RUN git clone https://github.com/mozilla/gecko-dev.git --single-branch --depth 1 --branch GECKO4502_2016040719_RELBRANCH /repo/gecko-dev
+#RUN git clone https://github.com/mozilla/gecko-dev.git --single-branch --depth 1 --branch GECKO4502_2016040719_RELBRANCH /repo/gecko-dev
 #ADD gecko-dev /repo/gecko-dev/
-RUN SHELL=$XTERM_SHELL /setup-spider.sh /
+#RUN SHELL=$XTERM_SHELL /setup-spider.sh /
 #RUN rm /repo/gecko-dev -rf
 
 #ADD js /repo/bin/spidermonkeyjs
