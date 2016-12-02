@@ -36,7 +36,7 @@ RUN /setup.sh /
 RUN git clone https://github.com/mozilla/gecko-dev.git --single-branch --depth 1 --branch GECKO4502_2016040719_RELBRANCH /repo/gecko-dev
 #ADD gecko-dev /repo/gecko-dev/
 RUN /setup-spider.sh /
-RUN rm /repo/gecko-dev -rf
+#RUN rm /repo/gecko-dev -rf
 
 #ADD js /repo/bin/spidermonkeyjs
 #RUN ln -s /repo/bin/spidermonkeyjs /usr/local/sbin/spidermonkeyjs -f
