@@ -30,6 +30,9 @@ RUN chmod +x *.sh
 
 RUN mkdir -p /repo/bin
 
+RUN /get-v8.sh /
+RUN /setup-v8.sh /
+
 RUN git clone https://github.com/kr-g/apache2-module-demo.git /repo/apache2-module-demo
 RUN /setup.sh /
 
