@@ -18,5 +18,5 @@ gclient sync
 
 cd v8
 
-make x64.release  library=shared 
+#make x64.release  library=shared 
 
