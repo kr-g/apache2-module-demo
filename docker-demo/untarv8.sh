@@ -8,7 +8,7 @@ cd $BDIR/v8
 
 tar -xvf ../archive-v8.tar
 
-ldconfig `pwd`
+#ldconfig `pwd`
 
-ldconfig -p|grep v8
+#ldconfig -p|grep v8
 
