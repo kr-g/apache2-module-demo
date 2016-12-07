@@ -33,7 +33,7 @@ RUN mkdir -p /repo/bin
 RUN /get-v8.sh /
 #RUN /setup-v8.sh /
 ADD archive-v8.tar /repo/bin/
-RUN /untarv8.sh /repo/bin/
+#RUN /untarv8.sh /repo/bin/
 
 RUN git clone https://github.com/kr-g/apache2-module-demo.git /repo/apache2-module-demo
 RUN /setup.sh /
