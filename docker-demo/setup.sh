@@ -19,6 +19,12 @@ sudo apxs -c -i -a mod_asdbjs.c
 
 
 
+#build the v8-int-demo
+
+cd $BDIR/repo/v8-int-demo
+
+make
+
 
 
 
