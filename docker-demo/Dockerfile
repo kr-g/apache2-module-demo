@@ -28,12 +28,12 @@ ADD *.html /js/
 ADD *.sh /
 RUN chmod +x *.sh
 
-RUN mkdir -p /repo/bin
+RUN mkdir -p /repo/bin/v8/
 
 RUN /get-v8.sh /
 #RUN /setup-v8.sh /
-ADD archive-v8.tar /repo/bin/
-#RUN /untarv8.sh /repo/bin/
+ADD archive-v8.tar /repo/bin/v8/
+RUN /setup-v8bin.sh /repo/bin/v8/
 
 RUN git clone https://github.com/kr-g/apache2-module-demo.git /repo/apache2-module-demo
 RUN /setup.sh /
