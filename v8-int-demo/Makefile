@@ -11,7 +11,7 @@ hello-world : hello-world.cc
 	@echo V8INC=${V8INC}
 	@echo V8BDIR=${V8BDIR}
 	@echo V8LDIR=${V8LDIR}
-	g++ -I. -I${V8INC} -I${V8INC}/include  hello-world.cc -o hello-world -lrt -ldl -lm -Wl,--start-group ${V8LDIR}/*.so -Wl,--end-group -pthread -std=c++0x 
+	g++ -I. -I${V8INC} -I${V8INC}/include  hello-world.cc -o hello-world -lrt -ldl -lm -Wl,--start-group ${BINDIR}/*.so -Wl,--end-group -pthread -std=c++0x 
 	cp ${BINDIR}/*.bin .
 
 .PHONY: clean
