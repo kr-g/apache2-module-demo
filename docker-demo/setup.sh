@@ -23,10 +23,7 @@ sudo apxs -c -i -a mod_asdbjs.c
 
 cd $BDIR/repo/v8-int-demo
 
-make
-
-
-
+HOME=  make
 
 
 
