@@ -19,6 +19,14 @@ a demo apache2 module which runs javascript on the server side. uses a build in 
 https://another-software-development-blog.blogspot.de/2016/11/web-development-part-2-mozilla.html
 
 
+## v8-int-demo
+the v8 demo hello world application
+
+### read the full article
+
+https://another-software-development-blog.blogspot.de/2016/12/webdevelopment-part-5-v8-javascript.html
+ 
+
 ## docker-demo
 the dockerized system for the apache2 module demo
 
