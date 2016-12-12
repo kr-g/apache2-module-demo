@@ -26,6 +26,13 @@ the v8 demo hello world application
 
 https://another-software-development-blog.blogspot.de/2016/12/webdevelopment-part-5-v8-javascript.html
  
+ 
+## mod-jsv8
+a demo apache2 module handler which integrates google v8 javascript
+
+### read the full article
+https://another-software-development-blog.blogspot.de/2016/12/webdevelopment-part-6-apache-module.html
+
 
 ## docker-demo
 the dockerized system for the apache2 module demo
