@@ -3,13 +3,18 @@
 apxs -q
 
 ##make the demo
-make -f cpp.Makefile clean && make -f cpp.Makefile 
+1. make -f cpp.Makefile clean 
+2. make -f cpp.Makefile 
 
 ##deploy the demo
-sudo apxs -i -n apxscpp mod_apxscpp.so && sudo service apache2 restart && curl localhost:83
+one of...
+- sudo make -f cpp.Makefile deploy
+- sudo apxs -i -n apxscpp mod_apxscpp.so && sudo service apache2 restart && curl localhost:83
 
 ##get the respond
 one of...
+- make -f cpp.Makefile curl
+- make -f cpp.Makefile curln
 - curl localhost:83
 - for i in \`seq 1 3\` ; do echo $i ; curl localhost:83  ; done
 

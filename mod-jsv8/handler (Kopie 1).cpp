@@ -72,7 +72,7 @@ void Load(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 using namespace v8;
 
-
+#define MAXPOSTSIZE -1
 #define BLOCKSIZE 256
 
 
@@ -266,10 +266,8 @@ class JSengine {
 		}
 
 		Local<Context> CreateGlobalContext(Isolate* isolate) {
-
 		  // Create a template for the global object.
 		  Local<ObjectTemplate> global = v8::ObjectTemplate::New(isolate);
-
 		  // Bind the global 'print' function to the C++ Print callback.
 		  global->Set(
 			  v8::String::NewFromUtf8(isolate, "print", v8::NewStringType::kNormal)
@@ -291,29 +289,20 @@ class JSengine {
 		  return v8::Context::New(isolate, NULL, global);
 		}
 
-#define LOCKSCOPE \
-			Locker v8Locker(isolate); \
-			Isolate::Scope isolate_scope(isolate); \
-			HandleScope handle_scope(isolate)
-
-#define LOCKSCOPECONTEXT \
-			LOCKSCOPE; \
-			Local<Context> context = CreateGlobalContext(isolate); \
-			Context::Scope context_scope(context)
-
-
 		int compile( const char* js ){
 
-			LOCKSCOPECONTEXT;
+			Locker v8Locker(isolate);
 
-			globalScript.Reset( isolate, _compile( js ));
+			Isolate::Scope isolate_scope(isolate);
 
-			return OK;
-		}
+			// Create a stack-allocated handle scope.
+			HandleScope handle_scope(isolate);
 
-		Local<Script> _compile( const char* js ){
+			// Create a new context.
+			Local<Context> context = Context::New(isolate);
 
-			EscapableHandleScope handle_scope(isolate);
+			// Enter the context for compiling and running the hello world script.
+			Context::Scope context_scope(context);
 
 			// Create a string containing the JavaScript source code.
 			Local<String> source =
@@ -321,21 +310,28 @@ class JSengine {
 				                    NewStringType::kNormal).ToLocalChecked();
 
 			// Compile the source code.
-			Local<Script> script = Script::Compile(isolate->GetCurrentContext(), source).ToLocalChecked() ;
+			globalScript.Reset( isolate, Script::Compile(context, source).ToLocalChecked() );
 
-			return handle_scope.Escape(script);;
+			return OK;
 		}
 
 		char* run( ){
 
-			LOCKSCOPECONTEXT;
+			Locker v8Locker(isolate);
 
-			return _run( globalScript.Get(isolate) ) ;
-		}
+			Isolate::Scope isolate_scope(isolate);
 
-		char* _run( Local<Script> script ){
+			// Create a stack-allocated handle scope.
+			HandleScope handle_scope(isolate);
 
-			Local<Value> result = script->Run(isolate->GetCurrentContext()).ToLocalChecked();
+			// Create a new context.
+			Local<Context> context = CreateGlobalContext(isolate);//Context::New(isolate);
+
+			// Enter the context for compiling and running the hello world script.
+			Context::Scope context_scope(context);
+
+			// Run the script to get the result.
+			Local<Value> result = globalScript.Get(isolate)->Run(context).ToLocalChecked();
 
 			// Convert the result to an UTF8 string and print it.
 			String::Utf8Value utf8(result);
@@ -344,21 +340,64 @@ class JSengine {
 			buf[0]=0;
 			strcat( buf, *utf8 );
 
+			//while ( v8::platform::PumpMessageLoop(platform, isolate ))	continue;
+
 			return buf;
 		}
 
 		char* runjs( const char* js ){
 
-			LOCKSCOPECONTEXT;
+			Locker v8Locker(isolate);
 
-			Local<Script> script = _compile( js );
-			char* buf = _run( script );
+			Isolate::Scope isolate_scope(isolate);
+
+			// Create a stack-allocated handle scope.
+			HandleScope handle_scope(isolate);
+
+			// Create a new context.
+			Local<Context> context = CreateGlobalContext(isolate);//Context::New(isolate);
+
+			// Enter the context for compiling and running the hello world script.
+			Context::Scope context_scope(context);
+
+			// Create a string containing the JavaScript source code.
+			Local<String> source =
+				String::NewFromUtf8(isolate, js, NewStringType::kNormal).ToLocalChecked();
+
+			TryCatch try_catch(isolate);
+
+			// Compile the source code.
+			Local<Script> script = Script::Compile(context, source).ToLocalChecked() ;
+
+			if( try_catch.HasCaught() ){
+				String::Utf8Value error( try_catch.Exception() );
+				//ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, r , "compile error v8: %s", (char*) *error );
+				ap_rprintf( r, "run error v8: " );
+				return NULL;
+			}
+
+			// Run the script to get the result.
+			Local<Value> result = script->Run(context).ToLocalChecked();
+
+			if( try_catch.HasCaught() ){
+				String::Utf8Value error(try_catch.Exception());
+				//ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, r , "run error v8: %s", (char*) *error );
+				ap_rprintf( r, "run error v8: " );
+				return NULL;
+			}
+
+			// Convert the result to an UTF8 string and print it.
+			String::Utf8Value utf8(result);
+			//ap_rprintf(r, "%s\n", *utf8);
+
+			char* buf = (char*)apr_palloc( r->pool, utf8.length() );
+			buf[0]=0;
+			strcat( buf, *utf8 );
+
+			//while ( v8::platform::PumpMessageLoop(platform, isolate ))	continue;
 
 			return buf;
 		}
-
-#undef LOCKSCOPECONTEXT
-#undef LOCKSCOPE
 
 		~JSengine(){
 
@@ -382,17 +421,12 @@ static apr_uint32_t calls = 0;
 
 
 
-
-
 int process_req( request_rec *r ){
 
 	try{
 
 		time_t current_time = time(NULL);
 		char* c_time_string = ctime(&current_time);
-
-		ap_rprintf( r, "request %s\n" , r->filename );
-
 
 		if( 0 == apr_atomic_inc32( & calls ) ){
 
@@ -406,14 +440,17 @@ int process_req( request_rec *r ){
 			theApp->setBaseDir( );
 			//ap_rprintf( theApp->getRequest(), "dir %s\n", theApp->getBaseDir().c_str() );
 
-			//theApp->compile( "print('Hello' + ', World! - demo integration run at ' + new Date().toString());" );
+			theApp->compile( "print('Hello' + ', World! - demo integration run at ' + new Date().toString());" );
 		}
+
+		//ap_rprintf( r, "result1 \n%s\n",theApp->run( ) );
+
+		//ap_rprintf( r, "path_info %s\n", r->path_info );
+		//ap_rprintf( r, "filename %s\n", r->filename );
 
 		theApp->setRequest( r );
 
-		//ap_rprintf( r, "precompiled js run \n" ); theApp->run( ); ap_rprintf( r, "\n" );
-
-		//ap_rprintf( r, "\npost data\n%s\n", theApp->get_post_data( ) );
+		//ap_rprintf( r, "post data\n%s\n", theApp->get_post_data( ) );
 
 		char* js = theApp->getjsfilecontent( r->filename );
 		if( js ){
