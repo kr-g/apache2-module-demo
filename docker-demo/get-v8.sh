@@ -18,5 +18,8 @@ gclient sync
 
 cd v8
 
-#make x64.release  library=shared 
+git checkout 083a5dcdfee3a6b7c3e41e4a2dc4420604e86641
+
+
+#make x64.release -j 4 library=shared
 

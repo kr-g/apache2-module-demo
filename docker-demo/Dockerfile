@@ -4,6 +4,7 @@ RUN apt-get update
 RUN apt-get install -y vim curl unzip sudo markdown
 RUN apt-get install -y git apache2 apache2-dev
 RUN apt-get install -y autoconf2.13 python
+RUN apt-get install -y g++ libz-dev
 
 
 EXPOSE 81
@@ -17,7 +18,7 @@ VOLUME /html
 RUN mkdir -p /var/www/js && ln -s /var/www/js /js
 VOLUME /js
 
-RUN mkdir -p /jsv8 && ln -s /var/www/jsv8 /jsv8
+RUN mkdir -p /var/www/jsv8 && ln -s /var/www/jsv8 /jsv8
 VOLUME /jsv8
 
 ADD vhost.txt /
@@ -32,19 +33,21 @@ ADD *.html /js/
 ADD *.sh /
 RUN chmod +x *.sh
 
-RUN mkdir -p /repo/v8/out/x64.release/lib.target
+RUN mkdir -p /repo/
 
 RUN /get-v8.sh /
 #RUN /setup-v8.sh /
 
+RUN mkdir -p /repo/v8/out/x64.release/lib.target
+
 ADD archive-v8.tar /repo/bin/v8/
-ADD archive-v8.tar /repo/v8/out/x64.release/lib.target
-RUN ldconfig /repo/v8/out/x64.release/lib.target
+ADD libv8-static.tar /repo/v8/out/x64.release/lib.target/
+RUN ldconfig && ldconfig /repo/v8/out/x64.release/lib.target/
 
 ADD demo-v8.tar /jsv8
 
 RUN git clone https://github.com/kr-g/apache2-module-demo.git /repo/apache2-module-demo
-RUN /setup.sh /
+RUN sudo /setup.sh /
 
 #RUN git clone https://github.com/mozilla/gecko-dev.git --single-branch --depth 1 --branch GECKO4502_2016040719_RELBRANCH /repo/gecko-dev
 #ADD gecko-dev /repo/gecko-dev/
