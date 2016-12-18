@@ -87,7 +87,7 @@ clean:
 	rm -f *.o *.so *.slo *.lo *.la
 
 deploy:
-	apxs -i -n $(MODNAM) mod_$(MODNAM).so
+	apxs -i -a -n $(MODNAM) mod_$(MODNAM).so
 	apachectl restart
 
 curl:
