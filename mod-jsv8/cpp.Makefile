@@ -91,10 +91,16 @@ deploy:
 	apachectl restart
 
 curl:
-	curl localhost:$(PORT)/{index,page,v8}
+	curl localhost:$(PORT)/{index,page,v8,index.html,index.css,v8.jsm,include.js}
+
+curldata:
+	curl localhost:$(PORT)/page -i --data a=15 --data b=3
+
+curlform:
+	curl localhost:$(PORT)/page -i -F a=15 -F b=3
 
 curln:
-	for i in `seq 1 3` ; do echo $i ; curl localhost:$(PORT)/{index,page,v8}  ; done
+	for i in `seq 1 3` ; do echo $i ; curl localhost:$(PORT)/{index,page,v8,index.html,index.css,v8.jsm,include.js} ; done
 
 #-----
 

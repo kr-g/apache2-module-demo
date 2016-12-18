@@ -1,6 +1,6 @@
 FROM ubuntu:16.04
 
-RUN apt-get update 
+RUN apt-get update
 RUN apt-get install -y vim curl unzip sudo markdown
 RUN apt-get install -y git apache2 apache2-dev
 RUN apt-get install -y autoconf2.13 python
@@ -8,6 +8,7 @@ RUN apt-get install -y autoconf2.13 python
 
 EXPOSE 81
 EXPOSE 82
+EXPOSE 83
 
 
 RUN mkdir -p /var/www/html && ln -s /var/www/html /html
@@ -15,6 +16,9 @@ VOLUME /html
 
 RUN mkdir -p /var/www/js && ln -s /var/www/js /js
 VOLUME /js
+
+RUN mkdir -p /jsv8 && ln -s /var/www/jsv8 /jsv8
+VOLUME /jsv8
 
 ADD vhost.txt /
 RUN cat vhost.txt >> /etc/apache2/sites-available/000-default.conf
@@ -28,12 +32,16 @@ ADD *.html /js/
 ADD *.sh /
 RUN chmod +x *.sh
 
-RUN mkdir -p /repo/bin/v8/
+RUN mkdir -p /repo/v8/out/x64.release/lib.target
 
 RUN /get-v8.sh /
 #RUN /setup-v8.sh /
+
 ADD archive-v8.tar /repo/bin/v8/
-RUN ldconfig /repo/bin/v8/
+ADD archive-v8.tar /repo/v8/out/x64.release/lib.target
+RUN ldconfig /repo/v8/out/x64.release/lib.target
+
+ADD demo-v8.tar /jsv8
 
 RUN git clone https://github.com/kr-g/apache2-module-demo.git /repo/apache2-module-demo
 RUN /setup.sh /
@@ -52,5 +60,7 @@ RUN spidermonkeyjs --version
 
 
 ENTRYPOINT sudo /startup.sh /
+
+
 
 

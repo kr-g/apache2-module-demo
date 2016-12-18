@@ -27,3 +27,12 @@ HOME=  make
 
 
 
+#build the mod-jsv8
+
+cd $BDIR/repo/mod-jsv8/
+
+HOME=  make -f cpp.Makefile
+HOME=  sudo make -f cpp.Makefile deploy
+
+
+

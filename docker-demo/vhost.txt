@@ -13,4 +13,12 @@
 
 </VirtualHost>
 
+<VirtualHost *:83>
+
+	SetHandler apxscpp
+	DirectoryIndex index.jsm
+	DocumentRoot /var/www/jsv8
+
+</VirtualHost>
+
 

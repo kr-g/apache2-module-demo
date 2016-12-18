@@ -15,6 +15,8 @@ one of...
 one of...
 - make -f cpp.Makefile curl
 - make -f cpp.Makefile curln
+- make -f cpp.Makefile curldata
+- make -f cpp.Makefile curlform
 - curl localhost:83
 - for i in \`seq 1 3\` ; do echo $i ; curl localhost:83  ; done
 
