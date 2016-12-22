@@ -14,15 +14,18 @@
 
 
 #include "httpd.h"
+#include "http_core.h"
 #include "http_config.h"
 #include "http_protocol.h"
 #include "http_log.h"
+#include "util_cookies.h"
+#include "ap_config.h"
 
 #include "apr.h"
 #include "apr_atomic.h"
 #include "apr_strings.h"
-
-#include "ap_config.h"
+#include "apr_uuid.h"
+#include "apr_network_io.h"
 
 #include "include/v8.h"
 #include "include/libplatform/libplatform.h"
@@ -41,6 +44,13 @@ void Method(const v8::FunctionCallbackInfo<v8::Value>& args) ;
 void Header(const v8::FunctionCallbackInfo<v8::Value>& args);
 void ApFilename(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Log(const v8::FunctionCallbackInfo<v8::Value>& args);
+void FTime(const v8::FunctionCallbackInfo<v8::Value>& args);
+void SetCookie(const v8::FunctionCallbackInfo<v8::Value>& args);
+void GetCookie(const v8::FunctionCallbackInfo<v8::Value>& args);
+void ClearCookie(const v8::FunctionCallbackInfo<v8::Value>& args);
+void SetHeader(const v8::FunctionCallbackInfo<v8::Value>& args);
+void Uuid(const v8::FunctionCallbackInfo<v8::Value>& args);
+void SocketSend(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 
 #if 0
@@ -132,9 +142,9 @@ class JSengine {
 			return basedir;
 		}
 
-		void setBaseDir( request_rec *r ){
-			char *dir = apr_pstrdup( r->pool, r->filename );
-			basedir.assign( (const char*) dirname( dir ) );
+		void setBaseDir( const char* dir ){
+			//char *dir = apr_pstrdup( r->pool, r->filename );
+			basedir.assign( dir );
 			basedir += "/";
 		}
 
@@ -343,6 +353,41 @@ class JSengine {
 						isolate, "log", v8::NewStringType::kNormal).ToLocalChecked(),
 					v8::FunctionTemplate::New(isolate, Log));
 
+			// Bind the global 'ftime' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "ftime", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, FTime));
+
+			// Bind the global 'getcookie' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "getcookie", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, GetCookie));
+
+			// Bind the global 'setcookie' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "setcookie", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, SetCookie));
+
+			// Bind the global 'clearcookie' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "clearcookie", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, ClearCookie));
+
+			// Bind the global 'setheader' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "setheader", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, SetHeader));
+
+			// Bind the global 'uuid' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "uuid", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, Uuid));
+
+			// Bind the global 'socketsend' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "socketsend", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, SocketSend));
+
 #if 0
 			// Bind the global 'load' function to the C++ Load callback.
 			global->Set(v8::String::NewFromUtf8(
@@ -447,14 +492,24 @@ class JSengine {
 			return buf;
 		}
 
-		void call(){
+		void call( const char* fnam, apr_time_t ftime ){
 
 			//LOCKSCOPECONTEXT( isolate, globalContext );
 
+			// strip away basedir
+			int l = basedir.length();
+			const char *fn = &fnam[l];
+
+			Local<String> file_name =
+				  String::NewFromUtf8(isolate, fn, NewStringType::kNormal)
+					  .ToLocalChecked();
+			Local<Integer> file_time =
+				  Integer::New(isolate, ftime);
+
 			// Invoke the process function, giving the global object as 'this'
 			// and one argument, the request.
-			const int argc = 0;
-			Local<Value> argv[] = {};
+			const int argc = 2;
+			Local<Value> argv[] = { file_name, file_time };
 			v8::Local<v8::Function> process =
 				v8::Local<v8::Function>::New(isolate, func);
 			Local<Value> result;
@@ -506,14 +561,14 @@ int process_req( request_rec *r ){
 		// this is a hack
 		// todo
 		// move this to handler startup
-		//
+		// dont use ap_document_root
 		if( 0 == apr_atomic_inc32( & calls ) ){
 
 			theApp = new JSengine( ) ;
 			// todo
 			// get the basedir from a server config
 			// not from the request itself
-			theApp->setBaseDir( r );
+			theApp->setBaseDir( ap_document_root(r) );
 
 			LOCKSCOPECONTEXT( theApp->isolate, theApp->globalContext );
 			theApp->setRequest( r );
@@ -554,15 +609,19 @@ int process_req( request_rec *r ){
 
 		theApp->setRequest( r );
 
-		// call precompiled route method
-		theApp->call();
+		// get the file time
+		apr_finfo_t finfo2;
+		apr_status_t stat = apr_stat ( &finfo2, srfnam.c_str(), APR_FINFO_MTIME, r->pool );
 
+		// call precompiled route method
+		theApp->call( srfnam.c_str(), stat ? 0 : finfo2.mtime );
+
+#if 0
 		char* js = theApp->getjsfilecontent( srfnam.c_str() );
 		if( js ){
-
 			char* buf = theApp->runjs( js );
-
 		}
+#endif
 
 	} catch( ... ){
 		ap_rprintf(r,"crashed\n");
@@ -579,6 +638,8 @@ const char* ToCString(const v8::String::Utf8Value& value) {
 	return *value ? *value : "<string conversion failed>";
 }
 
+// The callback that is invoked by v8 whenever the JavaScript 'print'
+// function is called.
 void Print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	bool first = true;
 	for (int i = 0; i < args.Length(); i++) {
@@ -598,8 +659,7 @@ void Print(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 // The callback that is invoked by v8 whenever the JavaScript 'read'
-// function is called.  This function loads the content of the file named in
-// the argument into a JavaScript string.
+// function is called.
 void Read(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	if (args.Length() != 1) {
 		args.GetIsolate()->ThrowException(
@@ -618,7 +678,7 @@ void Read(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	char *content = theApp->getfilecontent( (theApp->getBaseDir() + *file).c_str() );
 
 	Local<String> source =
-		String::NewFromUtf8(theApp->isolate, content, NewStringType::kNormal).ToLocalChecked();
+		String::NewFromUtf8(args.GetIsolate(), content, NewStringType::kNormal).ToLocalChecked();
 
 	//if (!ReadFile(args.GetIsolate(), *file).ToLocal(&source)) {
 	if( !content ){
@@ -630,7 +690,8 @@ void Read(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	args.GetReturnValue().Set(source);
 }
 
-
+// The callback that is invoked by v8 whenever the JavaScript 'status'
+// function is called.
 void Status(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	//v8::HandleScope handle_scope(args.GetIsolate());
@@ -655,8 +716,7 @@ void Status(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
 // The callback that is invoked by v8 whenever the JavaScript 'ctype'
-// function is called.  This function loads the content of the file named in
-// the argument into a JavaScript string.
+// function is called.
 void ContentType(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if (args.Length() != 1) {
@@ -674,8 +734,7 @@ void ContentType(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
 // The callback that is invoked by v8 whenever the JavaScript 'postdata'
-// function is called.  This function loads the content of the file named in
-// the argument into a JavaScript string.
+// function is called.
 void PostData(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if (args.Length() != 0 ) {
@@ -691,7 +750,7 @@ void PostData(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if( content ){
 		Local<String> data =
-			String::NewFromUtf8(theApp->isolate, content, NewStringType::kNormal).ToLocalChecked();
+			String::NewFromUtf8(args.GetIsolate(), content, NewStringType::kNormal).ToLocalChecked();
 
 		args.GetReturnValue().Set(data);
 		return;
@@ -703,8 +762,7 @@ void PostData(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
 // The callback that is invoked by v8 whenever the JavaScript 'unparseduri'
-// function is called.  This function loads the content of the file named in
-// the argument into a JavaScript string.
+// function is called.
 void UnparsedUri(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if (args.Length() != 0 ) {
@@ -718,7 +776,7 @@ void UnparsedUri(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if( content ){
 		Local<String> data =
-			String::NewFromUtf8(theApp->isolate, content, NewStringType::kNormal).ToLocalChecked();
+			String::NewFromUtf8(args.GetIsolate(), content, NewStringType::kNormal).ToLocalChecked();
 
 		args.GetReturnValue().Set(data);
 		return;
@@ -728,8 +786,7 @@ void UnparsedUri(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
 // The callback that is invoked by v8 whenever the JavaScript 'method'
-// function is called.  This function loads the content of the file named in
-// the argument into a JavaScript string.
+// function is called.
 void Method(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if (args.Length() != 0 ) {
@@ -743,7 +800,7 @@ void Method(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if( content ){
 		Local<String> data =
-			String::NewFromUtf8(theApp->isolate, content, NewStringType::kNormal).ToLocalChecked();
+			String::NewFromUtf8(args.GetIsolate(), content, NewStringType::kNormal).ToLocalChecked();
 
 		args.GetReturnValue().Set(data);
 		return;
@@ -753,8 +810,7 @@ void Method(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
 // The callback that is invoked by v8 whenever the JavaScript 'header'
-// function is called.  This function loads the content of the file named in
-// the argument into a JavaScript string.
+// function is called.
 void Header(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if (args.Length() != 1) {
@@ -775,7 +831,7 @@ void Header(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if (it != theApp->headers.end() ){
 		Local<String> data =
-			String::NewFromUtf8(theApp->isolate, it->second.c_str(), NewStringType::kNormal).ToLocalChecked();
+			String::NewFromUtf8(args.GetIsolate(), it->second.c_str(), NewStringType::kNormal).ToLocalChecked();
 		//ap_rprintf( theApp->getRequest(), "header->%s\n", it->second.c_str() );
 
 		args.GetReturnValue().Set(data);
@@ -786,8 +842,7 @@ void Header(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
 // The callback that is invoked by v8 whenever the JavaScript 'apfilename'
-// function is called.  This function loads the content of the file named in
-// the argument into a JavaScript string.
+// function is called.
 void ApFilename(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if (args.Length() != 0) {
@@ -798,7 +853,7 @@ void ApFilename(const v8::FunctionCallbackInfo<v8::Value>& args) {
 	}
 
 	Local<String> data =
-		String::NewFromUtf8(theApp->isolate, theApp->r->filename, NewStringType::kNormal).ToLocalChecked();
+		String::NewFromUtf8(args.GetIsolate(), theApp->r->filename, NewStringType::kNormal).ToLocalChecked();
 	//ap_rprintf( theApp->getRequest(), "filename->%s\n", theApp->r->filename );
 
 	args.GetReturnValue().Set(data);
@@ -807,8 +862,7 @@ void ApFilename(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 
 // The callback that is invoked by v8 whenever the JavaScript 'log'
-// function is called.  This function loads the content of the file named in
-// the argument into a JavaScript string.
+// function is called.
 void Log(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 	if (args.Length() != 1) {
@@ -825,7 +879,281 @@ void Log(const v8::FunctionCallbackInfo<v8::Value>& args) {
 }
 
 
+// The callback that is invoked by v8 whenever the JavaScript 'apfilename'
+// function is called.
+void FTime(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
+	if (args.Length() != 1) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value fnam(args[0]);
+
+	std::string fn = theApp->getBaseDir().c_str();
+	fn.append( *fnam );
+
+	// get the file time
+	apr_finfo_t finfo;
+	apr_status_t stat = apr_stat ( &finfo, fn.c_str(), APR_FINFO_MTIME, theApp->r->pool );
+	apr_time_t ftime = finfo.mtime;
+
+	Local<Integer> file_time = Integer::New( args.GetIsolate(), ftime);
+
+	args.GetReturnValue().Set(file_time);
+}
+
+
+
+// The callback that is invoked by v8 whenever the JavaScript 'setcookie'
+// function is called.
+void SetCookie(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	int argc = args.Length();
+
+	if ( !( argc == 2 || argc == 3 ) ) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value name(args[0]);
+	v8::String::Utf8Value value(args[1]);
+
+	int expr = 0;
+
+	if ( argc == 3 && !args[2]->IsInt32() ) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad value type",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	if ( argc == 3 ){
+		expr = args[2]->Int32Value();
+	}
+
+	std::string cookieargs;
+	//cookieargs.append( "secure;" );
+	cookieargs.append( "HttpOnly;Version=1;" );
+
+	apr_status_t st = ap_cookie_write( theApp->r, *name, *value, cookieargs.c_str(), expr, theApp->r->headers_out, NULL );
+}
+
+
+// The callback that is invoked by v8 whenever the JavaScript 'clearcookie'
+// function is called.
+void ClearCookie(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	if (args.Length() != 1) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value name(args[0]);
+
+	const char *val;
+	apr_status_t st = ap_cookie_read( theApp->r, *name, &val, 1 );
+
+}
+
+
+// The callback that is invoked by v8 whenever the JavaScript 'getcookie'
+// function is called.
+void GetCookie(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	if (args.Length() != 1) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value name(args[0]);
+
+	const char *val;
+	apr_status_t st = ap_cookie_read( theApp->r, *name, &val, 0 );
+
+	if( val != NULL ){
+
+		Local<String> data =
+			String::NewFromUtf8(args.GetIsolate(), val, NewStringType::kNormal).ToLocalChecked();
+
+		args.GetReturnValue().Set(data);
+
+	}
+
+}
+
+
+// The callback that is invoked by v8 whenever the JavaScript 'setheader'
+// function is called.
+void SetHeader(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	if (args.Length() != 2) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value name(args[0]);
+	v8::String::Utf8Value value(args[1]);
+
+	apr_table_add( theApp->r->headers_out, *name, *value );
+
+}
+
+
+// The callback that is invoked by v8 whenever the JavaScript 'uuid'
+// function is called.
+void Uuid(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	if (args.Length() != 0) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	apr_uuid_t uuid;
+	apr_uuid_get( &uuid );
+	char buf[APR_UUID_FORMATTED_LENGTH + 1];
+	apr_uuid_format( buf, &uuid );
+
+	Local<String> data =
+		String::NewFromUtf8(args.GetIsolate(), buf, NewStringType::kNormal).ToLocalChecked();
+
+	args.GetReturnValue().Set(data);
+
+}
+
+
+#define SLOG( L ) \
+		args.GetIsolate()->ThrowException( \
+				v8::String::NewFromUtf8(args.GetIsolate(), L, \
+					v8::NewStringType::kNormal).ToLocalChecked()); \
+		ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, theApp->r , L )
+
+// The callback that is invoked by v8 whenever the JavaScript 'socketsend'
+// function is called.
+void SocketSend(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	int argc = args.Length();
+
+	if ( argc != 4) {
+		SLOG( "Bad parameters" );
+		return;
+	}
+
+	v8::String::Utf8Value server(args[0]);
+	v8::String::Utf8Value data(args[1]);
+	int port = 80;
+	int timeout = 15;
+
+	if ( !args[2]->IsInt32() && !args[3]->IsInt32() ) {
+		SLOG( "Bad value type" );
+		return;
+	}
+
+	port = args[2]->Int32Value();
+	timeout = args[3]->Int32Value();
+
+	apr_sockaddr_t *sa;
+	apr_socket_t *sock;
+	apr_status_t st;
+
+#if 0
+	std::string l ;
+	l.append( "conneting to " );
+	l.append( *server );
+	l.append( ":" );
+	l.append( std::to_string(port) );
+	l.append( " to=" );
+	l.append( std::to_string(timeout) );
+	ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, theApp->r , l.c_str() );
+#endif
+
+	st = apr_sockaddr_info_get( &sa, *server, APR_INET, port, 0, theApp->r->pool );
+    if (st != APR_SUCCESS) {
+		SLOG( "server adress failed" );
+		return ;
+    }
+
+	st = apr_socket_create( &sock, APR_INET, SOCK_STREAM, APR_PROTO_TCP, theApp->r->pool );
+	if (st != APR_SUCCESS) {
+		SLOG( "create socket failed" );
+		return ;
+    }
+
+    apr_socket_opt_set( sock, APR_SO_NONBLOCK, 1 );
+    apr_socket_timeout_set( sock, APR_USEC_PER_SEC*timeout );
+
+	st = apr_socket_connect( sock, sa );
+    if (st != APR_SUCCESS) {
+		SLOG( "connect socket failed" );
+		return ;
+    }
+
+   	apr_socket_opt_set( sock, APR_SO_NONBLOCK, 1 );
+    apr_socket_timeout_set( sock, APR_USEC_PER_SEC*timeout );
+
+	apr_size_t len = data.length();
+
+	st = apr_socket_send( sock, *data, &len );
+    if (st != APR_SUCCESS) {
+		SLOG( "send on socket failed" );
+		return ;
+    }
+    if ( len != data.length() ) {
+		SLOG( "send buffer on socket failed" );
+		return ;
+    }
+
+	//ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, theApp->r , "data send" );
+
+	std::string resp;
+	apr_status_t rv;
+
+#define BUFLEN 64
+
+	char buf[BUFLEN+1];
+	len = 1;
+
+	while( 1 ) {
+		buf[BUFLEN] = 0;
+		len = sizeof(buf)-1;
+
+		rv = apr_socket_recv( sock, buf, &len );
+
+		if( len > 0 ){
+			buf[len] = 0;
+			resp.append( buf );
+			//ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, theApp->r , buf );
+		}
+		else {
+			//ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, theApp->r , ("nothing recv " + std::to_string(len)).c_str() );
+		}
+
+		if (rv == APR_EOF || rv == APR_TIMEUP || len == 0 ) {
+			break;
+		}
+
+	}
+
+	//apr_socket_close( sock );
+
+	Local<String> response =
+		String::NewFromUtf8(args.GetIsolate(), resp.c_str(), NewStringType::kNormal).ToLocalChecked();
+
+	args.GetReturnValue().Set(response);
+
+}
 
 
 extern "C" {
