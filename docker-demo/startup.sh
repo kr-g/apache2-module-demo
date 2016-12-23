@@ -1,10 +1,11 @@
 #!/bin/bash
 
+service redis-server start
 
 apachectl start
 
 
-#  start in debug mod 
+#  start in debug mod
 #apache2 -X
 
 

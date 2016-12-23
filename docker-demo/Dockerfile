@@ -5,6 +5,7 @@ RUN apt-get install -y vim curl unzip sudo markdown
 RUN apt-get install -y git apache2 apache2-dev
 RUN apt-get install -y autoconf2.13 python
 RUN apt-get install -y g++ libz-dev
+RUN apt-get install -y redis-server
 
 
 EXPOSE 81
@@ -45,6 +46,9 @@ ADD libv8-static.tar /repo/v8/out/x64.release/lib.target/
 RUN ldconfig && ldconfig /repo/v8/out/x64.release/lib.target/
 
 ADD demo-v8.tar /jsv8
+
+RUN git clone https://github.com/redis/hiredis.git /repo/hiredis
+RUN sudo /setup-redis.sh /
 
 RUN git clone https://github.com/kr-g/apache2-module-demo.git /repo/apache2-module-demo
 RUN sudo /setup.sh /

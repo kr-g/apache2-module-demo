@@ -31,6 +31,9 @@
 #include "include/libplatform/libplatform.h"
 
 
+#include "mod_redis.h"
+
+
 #define MODNAME "JSengine"
 
 
@@ -51,6 +54,10 @@ void ClearCookie(const v8::FunctionCallbackInfo<v8::Value>& args);
 void SetHeader(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Uuid(const v8::FunctionCallbackInfo<v8::Value>& args);
 void SocketSend(const v8::FunctionCallbackInfo<v8::Value>& args);
+void GetRedisKey(const v8::FunctionCallbackInfo<v8::Value>& args);
+void SetRedisKey(const v8::FunctionCallbackInfo<v8::Value>& args);
+void DelRedisKey(const v8::FunctionCallbackInfo<v8::Value>& args);
+void ExpireRedisKey(const v8::FunctionCallbackInfo<v8::Value>& args);
 
 
 #if 0
@@ -123,6 +130,8 @@ class JSengine {
 		std::string contentType ;
 
 		std::string jsm_ext = ".jsm";
+
+		modjsredis *redis = NULL;
 
 	private:
 
@@ -291,6 +300,16 @@ class JSengine {
 
 		}
 
+		void connectsessionserver( ){
+
+			if( !redis ){
+				redis = new modjsredis();
+				int rc = redis->connect();
+				ap_log_error( __FILE__, __LINE__, 0, 0, 0, r->server, "*** connect to redis %i ***", rc );
+			}
+
+		}
+
 	private:
 		Local<Context> CreateGlobalContext(Isolate* isolate) {
 
@@ -387,6 +406,26 @@ class JSengine {
 			global->Set(v8::String::NewFromUtf8(
 						isolate, "socketsend", v8::NewStringType::kNormal).ToLocalChecked(),
 					v8::FunctionTemplate::New(isolate, SocketSend));
+
+			// Bind the global '_getkey' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "_getkey", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, GetRedisKey));
+
+			// Bind the global '_setkey' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "_setkey", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, SetRedisKey));
+
+			// Bind the global '_delkey' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "_delkey", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, DelRedisKey));
+
+			// Bind the global '_expirekey' function to the C++ Read callback.
+			global->Set(v8::String::NewFromUtf8(
+						isolate, "_expirekey", v8::NewStringType::kNormal).ToLocalChecked(),
+					v8::FunctionTemplate::New(isolate, ExpireRedisKey));
 
 #if 0
 			// Bind the global 'load' function to the C++ Load callback.
@@ -523,6 +562,11 @@ class JSengine {
 
 		~JSengine(){
 
+			if( redis ){
+				delete redis;
+				redis = NULL;
+			}
+
 			isolate->Dispose();
 
 			v8::V8::Dispose();
@@ -572,6 +616,9 @@ int process_req( request_rec *r ){
 
 			LOCKSCOPECONTEXT( theApp->isolate, theApp->globalContext );
 			theApp->setRequest( r );
+
+			theApp->connectsessionserver();
+
 			std::string bd = theApp->getBaseDir().c_str();
 			char* mainjs = theApp->getjsfilecontent( (bd + "main.jsm").c_str() );
 			theApp->compile( mainjs );
@@ -1152,6 +1199,102 @@ void SocketSend(const v8::FunctionCallbackInfo<v8::Value>& args) {
 		String::NewFromUtf8(args.GetIsolate(), resp.c_str(), NewStringType::kNormal).ToLocalChecked();
 
 	args.GetReturnValue().Set(response);
+
+}
+
+
+// The callback that is invoked by v8 whenever the JavaScript '_getkey'
+// function is called.
+void GetRedisKey(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	if (args.Length() != 1) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value key(args[0]);
+	std::string val;
+
+	int rc = theApp->redis->get( *key, val );
+
+	if( rc == 0 ){
+
+		Local<String> data =
+			String::NewFromUtf8(args.GetIsolate(), val.c_str(), NewStringType::kNormal).ToLocalChecked();
+
+		args.GetReturnValue().Set(data);
+
+	}
+
+}
+
+
+// The callback that is invoked by v8 whenever the JavaScript '_setkey'
+// function is called.
+void SetRedisKey(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	if (args.Length() != 2) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value key(args[0]);
+	v8::String::Utf8Value val(args[1]);
+
+	//ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, theApp->r , "key %s, val %s", *key, *val );
+
+	theApp->redis->set( *key, *val );
+
+}
+
+
+// The callback that is invoked by v8 whenever the JavaScript '_setkey'
+// function is called.
+void DelRedisKey(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	if (args.Length() != 1) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value key(args[0]);
+
+	//ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, theApp->r , "del key %s", *key );
+
+	theApp->redis->del( *key );
+
+}
+
+
+// The callback that is invoked by v8 whenever the JavaScript '_expirekey'
+// function is called.
+void ExpireRedisKey(const v8::FunctionCallbackInfo<v8::Value>& args) {
+
+	if (args.Length() != 2) {
+		args.GetIsolate()->ThrowException(
+				v8::String::NewFromUtf8(args.GetIsolate(), "Bad parameters",
+					v8::NewStringType::kNormal).ToLocalChecked());
+		return;
+	}
+
+	v8::String::Utf8Value key(args[0]);
+
+	if ( !args[1]->IsInt32()  ) {
+		SLOG( "Bad value type" );
+		return;
+	}
+
+	int ttl = args[1]->Int32Value();
+
+	//ap_log_rerror( __FILE__,__LINE__,0, 0, NULL, theApp->r , "expire key %s, %i", *key, ttl );
+
+	theApp->redis->expire( *key, ttl );
 
 }
 

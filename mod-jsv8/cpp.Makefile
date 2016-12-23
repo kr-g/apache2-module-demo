@@ -15,6 +15,9 @@ V8LDIR=${V8BDIR}/lib.target
 
 # your inc and lib stuff
 
+OTHERINC=/usr/local/include/
+OTHERLIB=/usr/local/lib/
+
 
 JS_CFLAGS=-Os -s -lpthread -lz -lm -ldl
 JS_CPPFLAGS= -pthread -pipe -g -freorder-blocks -O3 -fno-omit-frame-pointer -lz -lm -ldl
@@ -57,8 +60,8 @@ all: mod_$(MODNAM).so hello-world
 # compile
 
 
-mod_handler.o: handler.cpp
-	$(CXX) -c -fPIC $(JS_CFLAGS) $(JS_CPPFLAGS) -I. -I$(APXS_INCLUDEDIR) -I$(APR_INCLUDEDIR) -I${V8INC} -I${V8INC}/include -Wall -o $@ $< -std=c++0x
+mod_handler.o: handler.cpp mod_redis.h
+	$(CXX) -c -fPIC $(JS_CFLAGS) $(JS_CPPFLAGS) -I. -I$(APXS_INCLUDEDIR) -I$(APR_INCLUDEDIR) -I${V8INC} -I${V8INC}/include -I$(OTHERINC) -I$(OTHERINC)/hiredis -Wall -o $@ $< -std=c++0x
 
 
 mod_$(MODNAM).o: mod_$(MODNAM).c
@@ -68,7 +71,7 @@ mod_$(MODNAM).o: mod_$(MODNAM).c
 # link with g++ instead of apxs / gcc
 
 mod_$(MODNAM).so: mod_$(MODNAM).o mod_handler.o
-	$(CXX) $(JS_CFLAGS) $(JS_CPPFLAGS) -fPIC -shared -o $@ mod_$(MODNAM).o mod_handler.o $(APXS_LIBS_SHLIB) -Wl,--start-group ${V8LDIR}/*.so -Wl,--end-group -pthread -std=c++0x -lrt -ldl -lm -lz
+	$(CXX) $(JS_CFLAGS) $(JS_CPPFLAGS) -fPIC -shared -o $@ mod_$(MODNAM).o mod_handler.o $(APXS_LIBS_SHLIB) -Wl,--start-group ${V8LDIR}/*.so -Wl,--end-group -pthread -std=c++0x -lrt -ldl -lm -lz -lhiredis -L$(OTHERLIB)
 #	cp ${V8BDIR}/*.bin .
 
 
