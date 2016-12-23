@@ -43,12 +43,15 @@ RUN mkdir -p /repo/v8/out/x64.release/lib.target
 
 ADD archive-v8.tar /repo/bin/v8/
 ADD libv8-static.tar /repo/v8/out/x64.release/lib.target/
-RUN ldconfig && ldconfig /repo/v8/out/x64.release/lib.target/
+
+#RUN ldconfig && ldconfig /repo/v8/out/x64.release/lib.target/
 
 ADD demo-v8.tar /jsv8
 
 RUN git clone https://github.com/redis/hiredis.git /repo/hiredis
 RUN sudo /setup-redis.sh /
+
+RUN ldconfig && ldconfig /repo/v8/out/x64.release/lib.target/
 
 RUN git clone https://github.com/kr-g/apache2-module-demo.git /repo/apache2-module-demo
 RUN sudo /setup.sh /
