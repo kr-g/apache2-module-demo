@@ -33,6 +33,8 @@ a demo apache2 module handler which integrates google v8 javascript
 ### read the full articles
 - https://another-software-development-blog.blogspot.de/2016/12/webdevelopment-part-6-apache-module.html
 - https://another-software-development-blog.blogspot.de/2016/12/webdevelopment-part-7-draft-apache.html
+- https://another-software-development-blog.blogspot.de/2016/12/webdevelopment-part-8-second-draft.html
+- https://another-software-development-blog.blogspot.de/2016/12/webdevelopment-part-9-session-handling.html
 
 
 ## docker-demo
